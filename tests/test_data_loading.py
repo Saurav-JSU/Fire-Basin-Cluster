@@ -19,7 +19,7 @@ class TestGEEDataLoader:
     @pytest.fixture
     def loader(self):
         """Create GEEDataLoader instance for testing."""
-        return GEEDataLoader(project_id='jsuhydrolabenb')
+        return GEEDataLoader(project_id='ee-jsuhydrolabenb')
     
     def test_loader_initialization(self, loader):
         """Test that loader initializes correctly."""
@@ -110,7 +110,7 @@ if __name__ == "__main__":
         sys.exit(1)
     
     # Test loader initialization
-    loader = GEEDataLoader(project_id='jsuhydrolabenb')
+    loader = GEEDataLoader(project_id='ee-jsuhydrolabenb')
     print(f"✓ Loader initialized: {loader is not None}")
     
     # Test configuration

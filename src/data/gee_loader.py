@@ -47,7 +47,7 @@ except ImportError:
         RAW_DATA_DIR.mkdir(parents=True, exist_ok=True)
         
         GEE_CONFIG = {
-            "project_id": "jsuhydrolabenb",
+            "project_id": "ee-jsuhydrolabenb",
             "service_account_key": None,
             "max_pixels": 1e9,
             "scale": 1000,

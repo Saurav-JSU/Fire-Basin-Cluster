@@ -1,3 +1,6 @@
 """Feature engineering and fire metrics calculation modules."""
 
-__all__ = []
+from .fire_metrics import WatershedFireMetrics
+from .temporal_analysis import TemporalFireAnalyzer
+
+__all__ = ['WatershedFireMetrics', 'TemporalFireAnalyzer']

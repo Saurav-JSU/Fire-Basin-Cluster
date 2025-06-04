@@ -75,7 +75,7 @@ earthengine authenticate
 from src.data.gee_loader import GEEDataLoader
 
 # Initialize the data loader with your project ID
-loader = GEEDataLoader(project_id='jsuhydrolabenb')
+loader = GEEDataLoader(project_id='ee-jsuhydrolabenb')
 
 # Authenticate with Google Earth Engine
 loader.authenticate()
@@ -185,6 +185,7 @@ wildfire_watershed_clustering/
 ├── run_tests.py             # Custom test runner
 ├── simple_test.py           # Simple standalone test (recommended first)
 ├── test_preprocessor.py     # FIRMS preprocessing test script
+├── test_step3_fire_metrics.py # Step 3 fire metrics test script
 ├── .gitignore               # Git ignore patterns
 ├── config/
 │   ├── __init__.py
@@ -194,11 +195,11 @@ wildfire_watershed_clustering/
 │   ├── data/
 │   │   ├── __init__.py
 │   │   ├── gee_loader.py      # Google Earth Engine data loading
-│   │   └── preprocessor.py    # Data preprocessing utilities
+│   │   └── preprocessor.py    # FIRMS fire event preprocessing
 │   ├── features/
 │   │   ├── __init__.py
-│   │   ├── fire_metrics.py    # Fire characteristic calculations
-│   │   └── temporal_analysis.py  # Temporal pattern analysis
+│   │   ├── fire_metrics.py    # Watershed fire characteristics calculation
+│   │   └── temporal_analysis.py  # Advanced temporal pattern analysis
 │   ├── clustering/
 │   │   ├── __init__.py
 │   │   ├── algorithms.py      # Clustering implementations
@@ -219,7 +220,8 @@ wildfire_watershed_clustering/
 └── tests/
     ├── __init__.py
     ├── test_data_loading.py
-    └── test_fire_metrics.py
+    ├── test_fire_preprocessing.py
+    └── test_fire_metrics.py      # Unit tests for Step 3 components
 ```
 
 ## 🖥️ System Specifications
@@ -245,7 +247,7 @@ wildfire_watershed_clustering/
   - [x] Git repository structure with .gitignore
   - [x] Cross-platform development environment support
   - [x] **Fixed**: Python import path issues and module structure
-  - [x] **Added**: Project ID configuration (jsuhydrolabenb)
+  - [x] **Added**: Project ID configuration (ee-jsuhydrolabenb)
   - [x] **Added**: Custom test runner for easier development
   - [x] **Added**: Development package installation setup
   - [x] **Added**: Robust config import handling with fallbacks
@@ -258,29 +260,41 @@ wildfire_watershed_clustering/
   - [x] Scientific methodology based on published research
   - [x] Comprehensive testing and validation framework
   - [x] Export capabilities for processed fire events
+- [x] **Step 3**: Watershed fire metrics calculation ✅
+  - [x] Fire return interval analysis (mean, median, variability, trends)
+  - [x] Burn fraction and spatial coverage calculations  
+  - [x] Fire seasonality and temporal distribution analysis
+  - [x] Fire intensity metrics (FRP, duration, confidence aggregation)
+  - [x] Composite fire regime indices and classifications
+  - [x] Advanced temporal pattern analysis (trends, cycles, regime changes)
+  - [x] Comprehensive fire characterization pipeline
+  - [x] Scientific methodology based on fire ecology research
+  - [x] Export capabilities and summary statistics
 
 ### 🚧 In Progress
 - [x] **Step 1**: Google Earth Engine data loading infrastructure ✅ 
 - [x] **Step 2**: FIRMS data preprocessing and fire event identification ✅
-  - [x] Fire detection point filtering and validation
-  - [x] Spatial-temporal clustering to identify fire events (DBSCAN)
-  - [x] Fire event characterization (duration, area, intensity)
-  - [x] Event validation and quality control
-  - [x] Real FIRMS data processing (no simulated data)
-  - [x] Export functionality for processed events
-- [ ] **Step 3**: Watershed fire metrics calculation
-  - [ ] Fire return interval analysis
-  - [ ] Burn fraction calculations per watershed
-  - [ ] Fire seasonality and temporal patterns
-  - [ ] Fire intensity aggregation metrics
+- [x] **Step 3**: Watershed fire metrics calculation ✅
+  - [x] Fire return interval analysis (mean, median, variability)
+  - [x] Burn fraction calculations per watershed
+  - [x] Fire seasonality and temporal patterns
+  - [x] Fire intensity aggregation metrics (FRP, duration, confidence)
+  - [x] Composite fire regime indices and classifications
+  - [x] Advanced temporal pattern analysis (trends, cycles, regime changes)
+  - [x] Complete watershed fire characterization pipeline
+- [ ] **Step 4**: Clustering algorithm implementation and validation
+  - [ ] Feature selection and standardization
+  - [ ] Multiple clustering algorithms (K-means, DBSCAN, GMM, Hierarchical)
+  - [ ] Optimal cluster number determination
+  - [ ] Cluster validation and interpretation
 
 ### 📅 Upcoming
-- [ ] **Step 3**: Watershed fire metrics calculation
-- [ ] **Step 4**: Fire characteristic feature extraction and standardization
-- [ ] **Step 5**: Clustering algorithm implementation and validation
-- [ ] **Step 6**: Results analysis and hydrological relevance testing
+- [ ] **Step 4**: Clustering algorithm implementation and validation
+- [ ] **Step 5**: Feature selection and dimensionality reduction
+- [ ] **Step 6**: Cluster interpretation and validation
 - [ ] **Step 7**: Visualization and reporting tools
-- [ ] **Step 8**: Documentation and case studies
+- [ ] **Step 8**: Hydrological relevance testing and case studies
+- [ ] **Step 9**: Documentation and publication preparation
 
 ## 🔬 Methodology
 Based on recent research in fire regime classification and watershed analysis:
