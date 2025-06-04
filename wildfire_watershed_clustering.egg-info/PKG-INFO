@@ -1,0 +1,329 @@
+Metadata-Version: 2.2
+Name: wildfire-watershed-clustering
+Version: 0.1.0
+Summary: Clustering HUC12 watersheds based on wildfire characteristics using Google Earth Engine
+Home-page: https://github.com/your-username/wildfire-watershed-clustering
+Author: Wildfire Watershed Clustering Team
+Author-email: 
+Classifier: Development Status :: 3 - Alpha
+Classifier: Intended Audience :: Science/Research
+Classifier: Topic :: Scientific/Engineering :: GIS
+Classifier: License :: OSI Approved :: MIT License
+Classifier: Programming Language :: Python :: 3
+Classifier: Programming Language :: Python :: 3.8
+Classifier: Programming Language :: Python :: 3.9
+Classifier: Programming Language :: Python :: 3.10
+Classifier: Programming Language :: Python :: 3.11
+Requires-Python: >=3.8
+Description-Content-Type: text/markdown
+Requires-Dist: numpy>=1.24.0
+Requires-Dist: pandas>=2.0.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: geopandas>=0.13.0
+Requires-Dist: rasterio>=1.3.0
+Requires-Dist: fiona>=1.9.0
+Requires-Dist: shapely>=2.0.0
+Requires-Dist: pyproj>=3.5.0
+Requires-Dist: earthengine-api>=0.1.350
+Requires-Dist: geemap>=0.24.0
+Requires-Dist: scikit-learn>=1.3.0
+Requires-Dist: scipy>=1.10.0
+Requires-Dist: matplotlib>=3.7.0
+Requires-Dist: seaborn>=0.12.0
+Requires-Dist: plotly>=5.15.0
+Requires-Dist: folium>=0.14.0
+Requires-Dist: joblib>=1.3.0
+Requires-Dist: dask>=2023.5.0
+Requires-Dist: multiprocessing-logging>=0.3.4
+Requires-Dist: pytest>=7.4.0
+Requires-Dist: jupyter>=1.0.0
+Requires-Dist: notebook>=7.0.0
+Requires-Dist: ipykernel>=6.25.0
+Requires-Dist: tqdm>=4.65.0
+Requires-Dist: pyyaml>=6.0
+Requires-Dist: python-dotenv>=1.0.0
+Provides-Extra: dev
+Requires-Dist: pytest>=7.4.0; extra == "dev"
+Requires-Dist: black; extra == "dev"
+Requires-Dist: flake8; extra == "dev"
+Requires-Dist: isort; extra == "dev"
+Provides-Extra: gpu
+Requires-Dist: cupy-cuda12x>=12.0.0; extra == "gpu"
+Dynamic: author
+Dynamic: classifier
+Dynamic: description
+Dynamic: description-content-type
+Dynamic: home-page
+Dynamic: provides-extra
+Dynamic: requires-dist
+Dynamic: requires-python
+Dynamic: summary
+
+# Wildfire Watershed Clustering Analysis
+
+## 🎯 Project Overview
+This project clusters HUC12 watershed subbasins in the Western United States based on their wildfire history and fire activity characteristics using Google Earth Engine data. The clustering serves as a benchmark for post-wildfire hydrological analysis.
+
+## 📊 Datasets
+- **HUC12 Subwatersheds**: `USGS/WBD/2017/HUC12` (2017-04-22)
+- **FIRMS Fire Data**: `FIRMS` (2000-11-01 to 2025-06-03)
+- **Study Area**: Western United States
+- **Fire Confidence Filter**: >80% (high-accuracy detections only)
+
+## 🚀 Quick Start
+
+### Prerequisites
+1. **Google Earth Engine Account**: Sign up at [https://earthengine.google.com/](https://earthengine.google.com/)
+2. **Python 3.8+**: Ensure you have Python 3.8 or higher installed
+3. **Git**: For cloning the repository
+
+### Installation
+
+#### Quick Setup (Recommended)
+```bash
+# Clone the repository
+git clone <repository-url>
+cd wildfire_watershed_clustering
+
+# Run setup script
+# On Linux/Mac:
+chmod +x setup.sh
+./setup.sh
+
+# On Windows:
+setup.bat
+```
+
+#### Manual Installation
+
+##### Option 1: Conda (Recommended for geospatial packages)
+```bash
+# Clone the repository
+git clone <repository-url>
+cd wildfire_watershed_clustering
+
+# Create conda environment from yml file
+conda env create -f environment.yml
+
+# Activate environment
+conda activate wildfire-watershed-clustering
+
+# Authenticate with Google Earth Engine (first time only)
+earthengine authenticate
+```
+
+##### Option 2: Pip + Virtual Environment
+```bash
+# Clone the repository
+git clone <repository-url>
+cd wildfire_watershed_clustering
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Authenticate with Google Earth Engine (first time only)
+earthengine authenticate
+```
+
+> **Note**: Conda is recommended for this project because it handles geospatial dependencies (GDAL, GEOS, PROJ) more reliably than pip.
+
+### Basic Usage
+```python
+from src.data.gee_loader import GEEDataLoader
+
+# Initialize the data loader with your project ID
+loader = GEEDataLoader(project_id='jsuhydrolabenb')
+
+# Authenticate with Google Earth Engine
+loader.authenticate()
+
+# Load HUC12 watersheds for Western US
+huc12_data = loader.load_huc12_watersheds()
+
+# Load FIRMS fire data (example: 2020 data)
+firms_data = loader.load_firms_data(
+    start_date="2020-01-01",
+    end_date="2020-12-31"
+)
+
+# Get dataset information
+info = loader.get_dataset_info()
+print(info)
+```
+
+### Testing
+```bash
+# Option 1: Run custom test runner (recommended)
+python run_tests.py
+
+# Option 2: Test with authentication
+python run_tests.py --auth
+
+# Option 3: Run pytest directly  
+python run_tests.py --pytest
+
+# Option 4: Traditional pytest (may need path setup)
+pytest tests/ -v
+```
+
+## 🔧 Troubleshooting
+
+### Common Issues
+
+**1. GDAL/GEOS/PROJ Installation Issues**
+- **Solution**: Use conda instead of pip for geospatial packages:
+  ```bash
+  conda env create -f environment.yml
+  ```
+
+**2. Google Earth Engine Authentication**
+- **Error**: `ee.EEException: Please authorize access to your Earth Engine account`
+- **Solution**: Run the authentication command:
+  ```bash
+  earthengine authenticate
+  ```
+
+**3. Import Errors**
+- **Error**: `ModuleNotFoundError: No module named 'src'` or `No module named 'data.gee_loader'`
+- **Solution**: Use the custom test runner:
+  ```bash
+  python run_tests.py
+  ```
+  Or install the package in development mode:
+  ```bash
+  pip install -e .
+  ```
+
+**4. Memory Issues with Large Datasets**
+- **Solution**: Adjust chunk sizes in `config/settings.py`:
+  ```python
+  PROCESSING_CONFIG["chunk_size"] = 500  # Reduce from 1000
+  PROCESSING_CONFIG["memory_limit"] = "32GB"  # Adjust based on your system
+  ```
+
+**5. Windows Path Issues**
+- **Error**: Path-related errors on Windows
+- **Solution**: Use the `setup.bat` script or ensure you're using forward slashes in paths
+
+### Getting Help
+- Check the [Issues](https://github.com/your-repo/issues) page for known problems
+- Create a new issue with detailed error messages and system information
+- Include your Python version, OS, and whether you're using conda or pip
+### Primary Metrics
+- Fire return intervals (mean, median, variability)
+- Fire frequency (events per decade) 
+- Burn area fraction per watershed
+- Fire seasonality patterns
+- Fire intensity proxies (FRP from FIRMS)
+- Time since last fire
+
+### Advanced Metrics
+- Fire regime stability indices
+- Spatial burn patterns within watersheds
+- Multi-temporal fire clustering
+- Fire duration characteristics
+
+## 🏗️ Project Structure
+```
+wildfire_watershed_clustering/
+├── README.md
+├── requirements.txt
+├── environment.yml           # Conda environment specification
+├── setup.py                  # Package installation configuration
+├── setup.sh                  # Setup script for Linux/Mac
+├── setup.bat                 # Setup script for Windows
+├── conftest.py              # Pytest configuration
+├── run_tests.py             # Custom test runner
+├── .gitignore               # Git ignore patterns
+├── config/
+│   ├── __init__.py
+│   └── settings.py
+├── src/
+│   ├── __init__.py
+│   ├── data/
+│   │   ├── __init__.py
+│   │   ├── gee_loader.py      # Google Earth Engine data loading
+│   │   └── preprocessor.py    # Data preprocessing utilities
+│   ├── features/
+│   │   ├── __init__.py
+│   │   ├── fire_metrics.py    # Fire characteristic calculations
+│   │   └── temporal_analysis.py  # Temporal pattern analysis
+│   ├── clustering/
+│   │   ├── __init__.py
+│   │   ├── algorithms.py      # Clustering implementations
+│   │   └── validation.py      # Cluster validation methods
+│   └── visualization/
+│       ├── __init__.py
+│       ├── maps.py           # Geospatial visualizations
+│       └── plots.py          # Statistical plots
+├── notebooks/
+│   ├── 01_data_exploration.ipynb
+│   ├── 02_feature_engineering.ipynb
+│   ├── 03_clustering_analysis.ipynb
+│   └── 04_results_visualization.ipynb
+├── data/
+│   ├── raw/                  # Downloaded GEE data
+│   ├── processed/            # Processed datasets
+│   └── results/              # Clustering results
+└── tests/
+    ├── __init__.py
+    ├── test_data_loading.py
+    └── test_fire_metrics.py
+```
+
+## 🖥️ System Specifications
+- **CPU**: AMD Ryzen Threadripper PRO 7995WX (96 cores, 192 threads)
+- **GPU**: NVIDIA RTX 6000 Ada Generation (49.1 GB VRAM)
+- **Parallel Processing**: Leveraged for large-scale data processing
+
+## 📋 Development Progress
+
+### ✅ Completed
+- [x] Project structure setup
+- [x] Initial README documentation
+- [x] **Step 1**: Google Earth Engine data loading infrastructure
+  - [x] Configuration management (`config/settings.py`)
+  - [x] GEE authentication and data loading (`src/data/gee_loader.py`)
+  - [x] HUC12 watershed boundary loading with Western US filtering
+  - [x] FIRMS fire data loading with confidence filtering (>80%)
+  - [x] Study area geometry creation and spatial filtering
+  - [x] Basic test suite for data loading functionality
+  - [x] Package structure and imports setup
+  - [x] Conda environment configuration (`environment.yml`)
+  - [x] Automated setup scripts for Linux/Mac/Windows
+  - [x] Git repository structure with .gitignore
+  - [x] Cross-platform development environment support
+  - [x] **Fixed**: Python import path issues and module structure
+  - [x] **Added**: Project ID configuration (jsuhydrolabenb)
+  - [x] **Added**: Custom test runner for easier development
+  - [x] **Added**: Development package installation setup
+
+### 🚧 In Progress
+- [ ] **Step 2**: FIRMS data preprocessing and fire event identification
+
+### 📅 Upcoming
+- [ ] **Step 3**: Spatial-temporal fire event clustering
+- [ ] **Step 4**: Fire characteristic feature extraction  
+- [ ] **Step 5**: Watershed fire metrics calculation
+- [ ] **Step 6**: Clustering algorithm implementation
+- [ ] **Step 7**: Validation and visualization
+- [ ] **Step 8**: Results analysis and hydrological relevance testing
+
+## 🔬 Methodology
+Based on recent research in fire regime classification and watershed analysis:
+- **Clustering Approach**: Multi-scale hierarchical clustering (DBSCAN, GMM, Hierarchical)
+- **Fire Event Definition**: Spatial-temporal clustering with 5-day temporal and 0.01° spatial thresholds
+- **Validation**: Geographic coherence, hydrological relevance, expert knowledge integration
+
+## 📚 Key References
+- Global pyromes and fire regime classification research
+- FIRMS fire detection and characterization methods
+- HUC12 watershed boundary applications
+- Post-wildfire hydrological impact studies
+
+---
+*Last Updated: June 4, 2025*
