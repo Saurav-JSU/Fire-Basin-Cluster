@@ -57,7 +57,7 @@ STUDY_AREA = {
 
 # Fire Data Processing Configuration
 FIRE_CONFIG = {
-    "confidence_threshold": 80,  # Minimum fire confidence percentage
+    "confidence_threshold": 80,  # Applied during point extraction, not collection filtering
     "spatial_threshold_degrees": 0.01,  # Spatial clustering threshold (degrees)
     "temporal_threshold_days": 5,  # Temporal clustering threshold (days)
     "fire_end_threshold_days": 16,  # Days without activity to consider fire ended

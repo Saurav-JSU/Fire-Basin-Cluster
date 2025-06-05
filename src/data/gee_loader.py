@@ -214,55 +214,56 @@ class GEEDataLoader:
             raise
     
     def load_firms_data(self, start_date: Optional[str] = None, 
-                       end_date: Optional[str] = None,
-                       confidence_threshold: Optional[int] = None) -> ee.ImageCollection:
+                    end_date: Optional[str] = None,
+                    confidence_threshold: Optional[int] = None) -> ee.ImageCollection:
         """
         Load FIRMS fire data for the study area and time period.
         
         Args:
             start_date: Start date (YYYY-MM-DD format)
             end_date: End date (YYYY-MM-DD format) 
-            confidence_threshold: Minimum fire confidence (default from config)
+            confidence_threshold: Minimum fire confidence (stored for later use)
             
         Returns:
             ee.ImageCollection: Filtered FIRMS fire data
         """
         if not self.authenticated:
             raise RuntimeError("Must authenticate with GEE first")
-        
+
         # Set defaults from config
         start_date = start_date or DATASETS["firms"]["start_date"]
         end_date = end_date or DATASETS["firms"]["end_date"]
         confidence_threshold = confidence_threshold or FIRE_CONFIG["confidence_threshold"]
-        
+
         logger.info(f"Loading FIRMS data from {start_date} to {end_date}...")
-        logger.info(f"Applying confidence threshold: >{confidence_threshold}%")
-        
+        logger.info(f"Confidence threshold: >{confidence_threshold}% (applied during point extraction)")
+
         try:
             # Load FIRMS dataset
             firms = ee.ImageCollection(DATASETS["firms"]["asset_id"])
-            
+
             # Filter by date range
             firms_filtered = firms.filterDate(start_date, end_date)
-            
+
             # Filter by study area
             study_area = self._create_study_area_geometry()
             firms_filtered = firms_filtered.filterBounds(study_area)
-            
-            # Apply confidence filter
-            firms_filtered = firms_filtered.filter(
-                ee.Filter.gt('confidence', confidence_threshold)
-            )
-            
+
+            # ✅ DO NOT filter confidence at collection level
+            # Confidence filtering happens during point extraction when we access pixel values
+
             # Get image count
             count = firms_filtered.size()
-            logger.info(f"Found {count.getInfo()} FIRMS images meeting criteria")
-            
+            logger.info(f"Found {count.getInfo()} FIRMS images meeting date/area criteria")
+
+            # Store confidence threshold for later use during point extraction
+            self.confidence_threshold = confidence_threshold
+
             # Cache the data
             self.firms_data = firms_filtered
-            
+
             return firms_filtered
-            
+
         except Exception as e:
             logger.error(f"Error loading FIRMS data: {e}")
             raise

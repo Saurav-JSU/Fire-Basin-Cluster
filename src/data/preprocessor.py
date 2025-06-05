@@ -95,8 +95,8 @@ class FIRMSPreprocessor:
         self.fire_events = None
         
     def extract_firms_points_from_gee(self, firms_collection: ee.ImageCollection,
-                                     geometry: ee.Geometry,
-                                     max_pixels: int = 50000) -> pd.DataFrame:
+                                    geometry: ee.Geometry,
+                                    max_pixels: int = 50000) -> pd.DataFrame:
         """
         Extract FIRMS fire detection points from Google Earth Engine ImageCollection.
         
@@ -126,23 +126,15 @@ class FIRMSPreprocessor:
                 # Get image date and metadata
                 date = image.date()
                 
-                # Create fire mask - FIRMS uses different band names
-                # Check available bands first
-                band_names = image.bandNames()
+                # ✅ Use correct FIRMS bands: ['T21', 'confidence', 'line_number']
+                # T21 = brightness temperature, confidence = detection confidence
                 
-                # FIRMS typically has these potential fire-related bands
-                fire_band = ee.Algorithms.If(
-                    band_names.contains('fire'),
-                    'fire',
-                    ee.Algorithms.If(
-                        band_names.contains('FireMask'),
-                        'FireMask',
-                        band_names.get(0)  # Use first band as fallback
-                    )
-                )
+                # Apply confidence threshold at PIXEL level
+                confidence_band = image.select('confidence')
+                confidence_mask = confidence_band.gt(self.confidence_threshold)
                 
-                # Create binary fire mask
-                fire_mask = image.select([fire_band]).gt(0)
+                # Create fire detection mask - any pixel with valid confidence > threshold
+                fire_mask = confidence_mask
                 
                 # Sample points from fire pixels
                 fire_points = fire_mask.sample(
@@ -154,16 +146,16 @@ class FIRMSPreprocessor:
                 
                 # Add metadata to each point
                 def add_metadata(feature):
-                    # Get pixel values for all available bands
-                    pixel_values = image.sample(
+                    # Get coordinates
+                    coords = feature.geometry().coordinates()
+                    
+                    # Sample all bands at this location
+                    point_data = image.sample(
                         region=feature.geometry(),
                         scale=1000,
                         numPixels=1,
                         geometries=False
                     ).first()
-                    
-                    # Add time and location metadata
-                    coords = feature.geometry().coordinates()
                     
                     return feature.set({
                         'date': date.format('YYYY-MM-dd'),
@@ -174,7 +166,10 @@ class FIRMSPreprocessor:
                         'month': date.get('month'),
                         'day': date.get('day'),
                         'doy': date.getRelative('day', 'year').add(1),  # Day of year
-                    }).copyProperties(pixel_values)
+                        'T21': point_data.get('T21'),  # Brightness temperature
+                        'confidence': point_data.get('confidence'),  # Detection confidence
+                        'line_number': point_data.get('line_number')  # FIRMS line number
+                    })
                 
                 return fire_points.map(add_metadata)
             
@@ -200,7 +195,7 @@ class FIRMSPreprocessor:
         except Exception as e:
             logger.error(f"Error extracting FIRMS points from GEE: {e}")
             raise
-    
+
     def _standardize_firms_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Standardize FIRMS DataFrame to consistent format.
@@ -230,40 +225,24 @@ class FIRMSPreprocessor:
         # Date standardization
         df_std['date'] = pd.to_datetime(df_std['date'], errors='coerce')
         
-        # Handle common FIRMS bands/attributes
-        firms_band_mapping = {
-            'confidence': 'confidence',
-            'Confidence': 'confidence', 
-            'FRP': 'frp',
-            'frp': 'frp',
-            'FireRadiativePower': 'frp',
-            'DayNight': 'daynight',
-            'daynight': 'daynight',
-            'Satellite': 'satellite',
-            'satellite': 'satellite'
-        }
+        # Standardize FIRMS-specific columns
+        if 'T21' in df_std.columns:
+            df_std['T21'] = pd.to_numeric(df_std['T21'], errors='coerce')
+            # Convert T21 (brightness temperature) to FRP proxy if needed
+            # For compatibility with downstream code expecting 'frp'
+            df_std['frp'] = df_std['T21']  # Use T21 as FRP proxy
         
-        # Rename columns to standard names
-        for old_name, new_name in firms_band_mapping.items():
-            if old_name in df_std.columns and new_name not in df_std.columns:
-                df_std = df_std.rename(columns={old_name: new_name})
-        
-        # Add default values for missing standard columns
-        if 'confidence' not in df_std.columns:
+        if 'confidence' in df_std.columns:
+            df_std['confidence'] = pd.to_numeric(df_std['confidence'], errors='coerce')
+        else:
             df_std['confidence'] = 90  # Default high confidence
-            logger.info("Added default confidence values (90%)")
         
-        if 'frp' not in df_std.columns:
-            df_std['frp'] = np.nan  # Will be filled if available
-            logger.info("Added FRP column with NaN values")
-        
+        # Add default values for expected columns
         if 'daynight' not in df_std.columns:
             df_std['daynight'] = 'D'  # Default to day
-            logger.info("Added default daynight values (D)")
         
         if 'satellite' not in df_std.columns:
-            df_std['satellite'] = 'MODIS'  # Default satellite
-            logger.info("Added default satellite values (MODIS)")
+            df_std['satellite'] = 'MODIS'  # FIRMS is MODIS-based
         
         # Data validation and cleaning
         initial_count = len(df_std)
@@ -277,9 +256,8 @@ class FIRMSPreprocessor:
             (df_std['latitude'] >= -90) & (df_std['latitude'] <= 90)
         ]
         
-        # Apply confidence threshold if confidence column exists
+        # Confidence was already filtered during extraction, but double-check
         if 'confidence' in df_std.columns:
-            df_std['confidence'] = pd.to_numeric(df_std['confidence'], errors='coerce')
             df_std = df_std[df_std['confidence'] >= self.confidence_threshold]
         
         final_count = len(df_std)
