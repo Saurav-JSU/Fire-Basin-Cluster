@@ -50,7 +50,8 @@ class ComprehensiveWildfireAnalysis:
     """
     
     def __init__(self, project_id: str = None, study_area: str = "western_us", 
-                 start_date: str = None, end_date: str = None, max_watersheds: int = None):
+                 start_date: str = None, end_date: str = None, max_watersheds: int = None,
+                 batch_size: Optional[int] = None, chunk_size: str = 'monthly'):
         """
         Initialize the Comprehensive Wildfire Analysis.
         
@@ -60,6 +61,8 @@ class ComprehensiveWildfireAnalysis:
             start_date: Analysis start date (YYYY-MM-DD)
             end_date: Analysis end date (YYYY-MM-DD)
             max_watersheds: Maximum number of watersheds to process
+            batch_size: Number of watersheds to process in each batch
+            chunk_size: Temporal chunk size for FIRMS data processing ('monthly' or 'yearly')
         """
         # Configuration
         self.project_id = project_id or PROJECT_CONFIG["project_id"]
@@ -67,6 +70,8 @@ class ComprehensiveWildfireAnalysis:
         self.start_date = start_date or ANALYSIS_CONFIG["start_date"]
         self.end_date = end_date or ANALYSIS_CONFIG["end_date"]
         self.max_watersheds = max_watersheds
+        self.batch_size = batch_size
+        self.chunk_size = chunk_size
         
         # Create output directories
         self.base_dir = Path(__file__).parent
@@ -209,9 +214,7 @@ class ComprehensiveWildfireAnalysis:
             from src.data.preprocessor import FIRMSPreprocessor
             
             self.firms_preprocessor = FIRMSPreprocessor(
-                spatial_threshold=0.01,    # 1km spatial threshold
-                temporal_threshold=5,      # 5-day temporal threshold
-                confidence_threshold=80    # 80% confidence threshold
+                chunk_size=self.chunk_size
             )
             
             logger.info("✅ FIRMS preprocessor initialized")
@@ -330,7 +333,7 @@ class ComprehensiveWildfireAnalysis:
                         watershed_fires = self.firms_preprocessor.extract_firms_points_from_gee(
                             self.firms_data,
                             watershed_geom,
-                            max_pixels=10000  # Reasonable limit per watershed
+                            max_pixels=50000  # Reasonable limit per watershed
                         )
                         
                         if len(watershed_fires) > 0:
@@ -678,6 +681,14 @@ def main():
         help="Number of watersheds to process per batch (default: 100)"
     )
     
+    # ✅ Add chunk size option
+    parser.add_argument(
+        "--chunk-size",
+        choices=['monthly', 'yearly'],
+        default='monthly',
+        help="Temporal chunk size for FIRMS data processing (default: monthly)"
+    )
+    
     parser.add_argument(
         "--step", 
         choices=['1', '2', '3', 'all'], 
@@ -730,11 +741,12 @@ def main():
         project_id=args.project_id,
         start_date=args.start_date,
         end_date=args.end_date,
-        max_watersheds=max_watersheds  # ✅ Pass scale parameter
+        max_watersheds=max_watersheds,  # ✅ Pass scale parameter
+        batch_size=args.batch_size,
+        chunk_size=args.chunk_size
     )
     
     # Store additional parameters
-    analysis.batch_size = args.batch_size
     analysis.scale_name = scale_name
     
     success = False

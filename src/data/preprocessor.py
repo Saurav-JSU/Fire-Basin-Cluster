@@ -72,7 +72,8 @@ class FIRMSPreprocessor:
     
     def __init__(self, spatial_threshold: Optional[float] = None,
                  temporal_threshold: Optional[int] = None,
-                 confidence_threshold: Optional[int] = None):
+                 confidence_threshold: Optional[int] = None,
+                 chunk_size: str = 'monthly'):
         """
         Initialize FIRMS preprocessor.
         
@@ -80,15 +81,18 @@ class FIRMSPreprocessor:
             spatial_threshold: Spatial clustering threshold in degrees (default: 0.01°)
             temporal_threshold: Temporal clustering threshold in days (default: 5)
             confidence_threshold: Minimum fire confidence percentage (default: 80)
+            chunk_size: Temporal chunk size for processing ('monthly' or 'yearly')
         """
         self.spatial_threshold = spatial_threshold or FIRE_CONFIG["spatial_threshold_degrees"]
         self.temporal_threshold = temporal_threshold or FIRE_CONFIG["temporal_threshold_days"]
         self.confidence_threshold = confidence_threshold or get_fire_confidence_threshold()
+        self.chunk_size = chunk_size
         
         logger.info(f"FIRMS Preprocessor initialized:")
         logger.info(f"  - Spatial threshold: {self.spatial_threshold}°")
         logger.info(f"  - Temporal threshold: {self.temporal_threshold} days")
         logger.info(f"  - Confidence threshold: {self.confidence_threshold}%")
+        logger.info(f"  - Chunk size: {self.chunk_size}")
         
         # Cache for processed data
         self.fire_detections = None
@@ -96,14 +100,15 @@ class FIRMSPreprocessor:
         
     def extract_firms_points_from_gee(self, firms_collection: ee.ImageCollection,
                                     geometry: ee.Geometry,
-                                    max_pixels: int = 50000) -> pd.DataFrame:
+                                    max_pixels: int = 10000) -> pd.DataFrame:
         """
         Extract FIRMS fire detection points from Google Earth Engine ImageCollection.
+        Uses temporal chunking to avoid memory limits.
         
         Args:
             firms_collection: Filtered FIRMS ImageCollection from GEE
             geometry: Study area geometry (e.g., HUC12 watershed)
-            max_pixels: Maximum number of pixels to sample
+            max_pixels: Maximum number of pixels to sample per chunk
             
         Returns:
             pd.DataFrame: Fire detection points with metadata
@@ -111,13 +116,34 @@ class FIRMSPreprocessor:
         logger.info("Extracting FIRMS detection points from Google Earth Engine")
         
         try:
-            # Get collection size
+            # Get collection size and date range
             collection_size = firms_collection.size().getInfo()
             logger.info(f"Processing {collection_size} FIRMS images")
             
             if collection_size == 0:
                 logger.warning("No FIRMS images found in collection")
                 return pd.DataFrame()
+            
+            # ✅ Check if collection is too large for single processing
+            if collection_size > 1000:
+                logger.info(f"Large collection ({collection_size} images) - using temporal chunking")
+                return self._extract_firms_chunked_temporal(firms_collection, geometry, max_pixels)
+            else:
+                logger.info(f"Moderate collection ({collection_size} images) - processing directly")
+                return self._extract_firms_single_chunk(firms_collection, geometry, max_pixels)
+                
+        except Exception as e:
+            logger.error(f"Error extracting FIRMS points from GEE: {e}")
+            raise
+
+    def _extract_firms_single_chunk(self, firms_collection: ee.ImageCollection,
+                                   geometry: ee.Geometry,
+                                   max_pixels: int) -> pd.DataFrame:
+        """Extract FIRMS points from a single (small) collection."""
+        
+        try:
+            # Reduce max_pixels for memory safety
+            safe_max_pixels = min(max_pixels, 5000)
             
             # Function to extract fire points from each image
             def extract_fire_points(image):
@@ -126,21 +152,19 @@ class FIRMSPreprocessor:
                 # Get image date and metadata
                 date = image.date()
                 
-                # ✅ Use correct FIRMS bands: ['T21', 'confidence', 'line_number']
-                # T21 = brightness temperature, confidence = detection confidence
-                
+                # Use correct FIRMS bands: ['T21', 'confidence', 'line_number']
                 # Apply confidence threshold at PIXEL level
                 confidence_band = image.select('confidence')
                 confidence_mask = confidence_band.gt(self.confidence_threshold)
                 
-                # Create fire detection mask - any pixel with valid confidence > threshold
+                # Create fire detection mask
                 fire_mask = confidence_mask
                 
-                # Sample points from fire pixels
+                # Sample points from fire pixels with reduced pixel count
                 fire_points = fire_mask.sample(
                     region=geometry,
                     scale=1000,  # 1km resolution
-                    numPixels=max_pixels,
+                    numPixels=safe_max_pixels,
                     geometries=True
                 )
                 
@@ -165,10 +189,10 @@ class FIRMSPreprocessor:
                         'year': date.get('year'),
                         'month': date.get('month'),
                         'day': date.get('day'),
-                        'doy': date.getRelative('day', 'year').add(1),  # Day of year
-                        'T21': point_data.get('T21'),  # Brightness temperature
-                        'confidence': point_data.get('confidence'),  # Detection confidence
-                        'line_number': point_data.get('line_number')  # FIRMS line number
+                        'doy': date.getRelative('day', 'year').add(1),
+                        'T21': point_data.get('T21'),
+                        'confidence': point_data.get('confidence'),
+                        'line_number': point_data.get('line_number')
                     })
                 
                 return fire_points.map(add_metadata)
@@ -193,8 +217,137 @@ class FIRMSPreprocessor:
             return self._standardize_firms_dataframe(df)
             
         except Exception as e:
-            logger.error(f"Error extracting FIRMS points from GEE: {e}")
-            raise
+            # If memory error, try with even smaller pixel count
+            if "memory" in str(e).lower() or "limit" in str(e).lower():
+                logger.warning(f"Memory limit hit, retrying with reduced pixel count...")
+                return self._extract_firms_single_chunk(firms_collection, geometry, max_pixels // 2)
+            else:
+                raise
+
+    def _extract_firms_chunked_temporal(self, firms_collection: ee.ImageCollection,
+                                      geometry: ee.Geometry,
+                                      max_pixels: int) -> pd.DataFrame:
+        """Extract FIRMS points using temporal chunking to avoid memory limits."""
+        
+        logger.info("Using temporal chunking for large FIRMS collection")
+        
+        try:
+            # Get date range of the collection
+            date_range = firms_collection.reduceColumns(
+                ee.Reducer.minMax(), ['system:time_start']
+            ).getInfo()
+            
+            start_date = ee.Date(date_range['min']).format('YYYY-MM-dd').getInfo()
+            end_date = ee.Date(date_range['max']).format('YYYY-MM-dd').getInfo()
+            
+            logger.info(f"Collection date range: {start_date} to {end_date}")
+            
+            # Create temporal chunks using specified chunk size
+            chunks = self._create_temporal_chunks(start_date, end_date, chunk_type=self.chunk_size)
+            
+            logger.info(f"Processing {len(chunks)} temporal chunks")
+            
+            all_dataframes = []
+            successful_chunks = 0
+            
+            for i, (chunk_start, chunk_end) in enumerate(chunks):
+                logger.info(f"Processing chunk {i+1}/{len(chunks)}: {chunk_start} to {chunk_end}")
+                
+                try:
+                    # Filter collection to this time chunk
+                    chunk_collection = firms_collection.filterDate(chunk_start, chunk_end)
+                    chunk_size = chunk_collection.size().getInfo()
+                    
+                    if chunk_size == 0:
+                        logger.info(f"  No images in chunk {i+1}, skipping")
+                        continue
+                    
+                    logger.info(f"  Chunk {i+1}: {chunk_size} images")
+                    
+                    # Process this chunk with reduced pixel count
+                    chunk_pixels = min(max_pixels // len(chunks), 2000)  # Distribute pixels across chunks
+                    
+                    chunk_df = self._extract_firms_single_chunk(
+                        chunk_collection, 
+                        geometry, 
+                        chunk_pixels
+                    )
+                    
+                    if len(chunk_df) > 0:
+                        all_dataframes.append(chunk_df)
+                        successful_chunks += 1
+                        logger.info(f"  ✅ Chunk {i+1}: {len(chunk_df)} detections")
+                    else:
+                        logger.info(f"  ℹ️ Chunk {i+1}: No detections")
+                    
+                except Exception as e:
+                    logger.warning(f"  ⚠️ Chunk {i+1} failed: {e}")
+                    continue
+            
+            logger.info(f"Processed {successful_chunks}/{len(chunks)} chunks successfully")
+            
+            # Combine all chunks
+            if all_dataframes:
+                combined_df = pd.concat(all_dataframes, ignore_index=True)
+                logger.info(f"Combined total: {len(combined_df)} fire detections")
+                return combined_df
+            else:
+                logger.warning("No fire detections found in any temporal chunk")
+                return pd.DataFrame()
+                
+        except Exception as e:
+            logger.error(f"Error in temporal chunking: {e}")
+            # Fallback: try single chunk with very small pixel count
+            logger.info("Falling back to single chunk with minimal pixels...")
+            return self._extract_firms_single_chunk(firms_collection, geometry, 1000)
+
+    def _create_temporal_chunks(self, start_date: str, end_date: str, 
+                              chunk_type: str = 'monthly') -> List[Tuple[str, str]]:
+        """Create temporal chunks for processing large date ranges."""
+        
+        from datetime import datetime, timedelta
+        import calendar
+        
+        start_dt = datetime.strptime(start_date, '%Y-%m-%d')
+        end_dt = datetime.strptime(end_date, '%Y-%m-%d')
+        
+        chunks = []
+        current_dt = start_dt
+        
+        if chunk_type == 'monthly':
+            while current_dt <= end_dt:
+                # Get last day of current month
+                _, last_day = calendar.monthrange(current_dt.year, current_dt.month)
+                chunk_end_dt = datetime(current_dt.year, current_dt.month, last_day)
+                
+                # Don't go past the actual end date
+                chunk_end_dt = min(chunk_end_dt, end_dt)
+                
+                chunk_start = current_dt.strftime('%Y-%m-%d')
+                chunk_end = chunk_end_dt.strftime('%Y-%m-%d')
+                
+                chunks.append((chunk_start, chunk_end))
+                
+                # Move to first day of next month
+                if current_dt.month == 12:
+                    current_dt = datetime(current_dt.year + 1, 1, 1)
+                else:
+                    current_dt = datetime(current_dt.year, current_dt.month + 1, 1)
+        
+        elif chunk_type == 'yearly':
+            while current_dt <= end_dt:
+                chunk_end_dt = datetime(current_dt.year, 12, 31)
+                chunk_end_dt = min(chunk_end_dt, end_dt)
+                
+                chunk_start = current_dt.strftime('%Y-%m-%d')
+                chunk_end = chunk_end_dt.strftime('%Y-%m-%d')
+                
+                chunks.append((chunk_start, chunk_end))
+                
+                # Move to next year
+                current_dt = datetime(current_dt.year + 1, 1, 1)
+        
+        return chunks
 
     def _standardize_firms_dataframe(self, df: pd.DataFrame) -> pd.DataFrame:
         """

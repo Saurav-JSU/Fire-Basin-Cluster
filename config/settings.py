@@ -45,7 +45,7 @@ STUDY_AREA = {
     "name": "Western_United_States",
     "bounds": {
         "west": -125.0,    # Western boundary (Pacific Coast)
-        "east": -102.0,    # Eastern boundary (approximately Colorado/New Mexico eastern border)
+        "east": -109.0,    # Eastern boundary (adjusted to -109)
         "south": 31.0,     # Southern boundary (Mexico border)
         "north": 49.0      # Northern boundary (Canada border)
     },
